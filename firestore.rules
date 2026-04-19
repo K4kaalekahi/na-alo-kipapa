@@ -1,0 +1,159 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.auth.token.email == "joshua.k.monteilh@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(data, ['uid', 'email', 'displayName', 'createdAt', 'role']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.email is string && isValidEmail(data.email) && data.email.size() < 100 &&
+             (!('displayName' in data) || data.displayName == null || (data.displayName is string && data.displayName.size() <= 100)) &&
+             data.createdAt is timestamp &&
+             (!('role' in data) || data.role in ['user', 'admin']);
+    }
+
+    function isValidSavedWord(data) {
+      return hasOnlyAllowedFields(data, ['userId', 'hawaiian', 'english', 'pronunciation', 'nextReview', 'interval', 'easeFactor', 'repetition', 'createdAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.hawaiian is string && data.hawaiian.size() > 0 && data.hawaiian.size() <= 200 &&
+             data.english is string && data.english.size() > 0 && data.english.size() <= 200 &&
+             (!('pronunciation' in data) || data.pronunciation == null || (data.pronunciation is string && data.pronunciation.size() <= 200)) &&
+             (!('nextReview' in data) || data.nextReview is timestamp) &&
+             (!('interval' in data) || data.interval is int) &&
+             (!('easeFactor' in data) || data.easeFactor is number) &&
+             (!('repetition' in data) || data.repetition is int) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidUserProgress(data) {
+      return hasOnlyAllowedFields(data, ['userId', 'points', 'streak', 'lastActive', 'badges', 'displayName', 'photoURL', 'isPublic']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.points is int && data.points >= 0 &&
+             data.streak is int && data.streak >= 0 &&
+             data.lastActive is timestamp &&
+             (!('badges' in data) || data.badges is list) &&
+             (!('displayName' in data) || data.displayName == null || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+             (!('isPublic' in data) || data.isPublic is bool);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && 
+                    hasRequiredFields(incoming(), ['uid', 'email', 'createdAt']) && 
+                    isValidUser(incoming()) &&
+                    // Strict: user cannot set their own role to admin on creation
+                    (!('role' in incoming()) || incoming().role == 'user');
+      allow update: if isOwner(userId) && 
+                    isValidUser(incoming()) &&
+                    incoming().uid == existing().uid &&
+                    incoming().email == existing().email &&
+                    incoming().createdAt == existing().createdAt &&
+                    // Strict: user cannot modify their own role
+                    (!('role' in incoming()) || incoming().role == existing().role);
+      // Admin bypass
+      allow write: if isAdmin();
+    }
+
+    match /savedWords/{wordId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && 
+                    isValidId(wordId) &&
+                    hasRequiredFields(incoming(), ['userId', 'hawaiian', 'english', 'createdAt']) && 
+                    isValidSavedWord(incoming());
+      allow update: if isSignedIn() &&
+                    isDocOwner() &&
+                    isValidSavedWord(incoming()) &&
+                    incoming().userId == existing().userId &&
+                    incoming().createdAt == existing().createdAt;
+      allow delete: if isDocOwner();
+    }
+
+    match /userProgress/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isSignedIn() && resource.data.isPublic == true;
+      allow create: if isOwner(userId) && 
+                    isValidId(userId) &&
+                    hasRequiredFields(incoming(), ['userId', 'points', 'streak', 'lastActive']) && 
+                    isValidUserProgress(incoming());
+      allow update: if isOwner(userId) && 
+                    isValidUserProgress(incoming()) &&
+                    incoming().userId == existing().userId &&
+                    // Action based partitioning isn't strictly requested but identity is fixed
+                    incoming().diff(existing()).affectedKeys().hasOnly(['points', 'streak', 'lastActive', 'badges', 'displayName', 'photoURL', 'isPublic']);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /readingMaterials/{materialId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.isPublic == true;
+      allow write: if isAdmin();
+    }
+
+    match /cultureLessons/{lessonId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.isPublic == true;
+      allow write: if isAdmin();
+    }
+  }
+}

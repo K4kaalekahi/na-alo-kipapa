@@ -1,0 +1,8 @@
+{
+  "name": "Na Alo Kipapa ",
+  "description": "An immersive Hawaiian language learning application with an AI-powered avatar instructor, pronunciation practice, and cultural context.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}

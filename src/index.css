@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Manrope:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --font-headline: "Noto Serif", serif;
+  --font-body: "Manrope", sans-serif;
+  --font-label: "Manrope", sans-serif;
+
+  --color-primary: #9e4324;
+  --color-on-primary: #fff7f5;
+  --color-primary-container: #ffad93;
+  --color-on-primary-container: #702205;
+  --color-secondary: #356574;
+  --color-on-secondary: #f0fbff;
+  --color-secondary-container: #bcedfe;
+  --color-on-secondary-container: #295a68;
+  --color-tertiary: #934753;
+  --color-on-tertiary: #fff7f7;
+  --color-tertiary-container: #fd9eaa;
+  --color-on-tertiary-container: #61202c;
+  --color-error: #ac3434;
+  --color-on-error: #fff7f6;
+  --color-error-container: #f56965;
+  --color-on-error-container: #65000b;
+  --color-background: #fff8f1;
+  --color-on-background: #363228;
+  --color-surface: #fff8f1;
+  --color-on-surface: #363228;
+  --color-surface-variant: #eae1d3;
+  --color-on-surface-variant: #645e53;
+  --color-outline: #807a6e;
+  --color-outline-variant: #b9b1a4;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #faf3e8;
+  --color-surface-container: #f5ede1;
+  --color-surface-container-high: #efe7da;
+  --color-surface-container-highest: #eae1d3;
+  --color-surface-bright: #fff8f1;
+  --color-surface-dim: #e2d9c9;
+  --color-surface-tint: #9e4324;
+  --color-inverse-surface: #100e09;
+  --color-inverse-on-surface: #a29c94;
+  --color-inverse-primary: #fd8c67;
+}
+
+@layer base {
+  body {
+    @apply text-on-surface font-body antialiased min-h-screen selection:bg-primary/20;
+    background: 
+      radial-gradient(circle at 0% 0%, rgba(158, 67, 36, 0.15) 0%, transparent 40%),
+      radial-gradient(circle at 100% 0%, rgba(53, 101, 116, 0.15) 0%, transparent 40%),
+      radial-gradient(circle at 100% 100%, rgba(147, 71, 83, 0.15) 0%, transparent 40%),
+      radial-gradient(circle at 0% 100%, rgba(53, 101, 116, 0.15) 0%, transparent 40%),
+      #fffdfa;
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  .glass-glow {
+    box-shadow: 
+      inset 0 0 20px rgba(255, 255, 255, 0.5),
+      0 20px 50px rgba(0, 0, 0, 0.02);
+  }
+}
+
+.ambient-shadow {
+  box-shadow: 0 24px 40px -4px rgba(54, 50, 40, 0.04);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2rem;
+  box-shadow: 0 24px 40px -4px rgba(54, 50, 40, 0.04);
+}
+
+.haptic-button {
+  box-shadow: 0 2px 0 0 #8e381a;
+}
+
+.haptic-button:active {
+  box-shadow: 0 0px 0 0 #8e381a;
+  transform: translateY(2px);
+}

@@ -1,0 +1,179 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address"
+        },
+        "displayName": {
+          "type": ["string", "null"],
+          "description": "The user's display name"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the user profile was created"
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "SavedWord": {
+      "title": "SavedWord",
+      "description": "A vocabulary word saved by the user",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who saved the word"
+        },
+        "hawaiian": {
+          "type": "string",
+          "description": "The Hawaiian word"
+        },
+        "english": {
+          "type": "string",
+          "description": "The English translation"
+        },
+        "pronunciation": {
+          "type": "string",
+          "description": "The phonetic pronunciation guide"
+        },
+        "nextReview": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the word should be reviewed next"
+        },
+        "interval": {
+          "type": "integer",
+          "description": "Current review interval in days"
+        },
+        "easeFactor": {
+          "type": "number",
+          "description": "Ease factor for SRS algorithm"
+        },
+        "repetition": {
+          "type": "integer",
+          "description": "Number of successful repetitions"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the word was saved"
+        }
+      },
+      "required": ["userId", "hawaiian", "english", "createdAt"]
+    },
+    "UserProgress": {
+      "title": "UserProgress",
+      "description": "Tracks user points, streaks, and achievements",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The user's unique ID"
+        },
+        "points": {
+          "type": "integer",
+          "description": "Total points earned"
+        },
+        "streak": {
+          "type": "integer",
+          "description": "Current daily streak"
+        },
+        "lastActive": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the user was active"
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of earned badges"
+        },
+        "displayName": {
+          "type": ["string", "null"],
+          "description": "The user's display name used for progress tracking"
+        },
+        "photoURL": {
+          "type": ["string", "null"],
+          "description": "URL to the user's profile picture"
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether this progress is visible on the leaderboard"
+        }
+      },
+      "required": ["userId", "points", "streak", "lastActive"]
+    },
+    "ReadingMaterial": {
+      "title": "ReadingMaterial",
+      "description": "Stories and texts for reading practice",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["Beginner", "Intermediate", "Advanced"] },
+        "paragraphs": { "type": "array", "items": { "type": "string" } },
+        "category": { "type": "string" },
+        "isPublic": { "type": "boolean" }
+      },
+      "required": ["title", "difficulty", "paragraphs"]
+    },
+    "CultureLesson": {
+      "title": "CultureLesson",
+      "description": "Interactive lessons for cultural content",
+      "type": "object",
+      "properties": {
+        "contentId": { "type": "string" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correctAnswer": { "type": "integer" }
+            }
+          }
+        },
+        "isPublic": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores user profiles"
+    },
+    "/savedWords/{wordId}": {
+      "schema": {
+        "$ref": "#/entities/SavedWord"
+      },
+      "description": "Stores words saved by users"
+    },
+    "/userProgress/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProgress"
+      },
+      "description": "Stores user gamification progress"
+    },
+    "/readingMaterials/{materialId}": {
+      "schema": {
+        "$ref": "#/entities/ReadingMaterial"
+      },
+      "description": "Stores reading materials"
+    }
+  }
+}
