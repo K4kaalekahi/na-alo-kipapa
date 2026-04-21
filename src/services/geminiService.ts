@@ -21,39 +21,24 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, delay = 2000):
       await new Promise(resolve => setTimeout(resolve, i === 0 ? 500 : 0));
       return await fn();
     } catch (error: any) {
-      lastError = error;
+      const { message: errorMessage, code: errorCode } = getErrorDetails(error);
       
-      // Robust error parsing
-      let errorMessage = "";
-      let errorCode = 0;
-      let errorStatus = "";
+      // Normalize to a standard Error so that console.error(error) logs a clean string instead of raw JSON.
+      const normalizedError = new Error(errorMessage || "Unknown Gemini API Error");
+      (normalizedError as any).code = errorCode;
       
-      try {
-        errorMessage = error.message || "";
-        errorCode = error.code || error.response?.status || 0;
-        errorStatus = error.status || "";
-        
-        // If message is a JSON string, extract details
-        if (errorMessage.startsWith('{') || errorMessage.includes('"error"')) {
-          const jsonMatch = errorMessage.match(/\{.*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            errorCode = parsed.error?.code || errorCode;
-            errorMessage = parsed.error?.message || errorMessage;
-            errorStatus = parsed.error?.status || errorStatus;
-          }
-        }
-      } catch (e) {
-        errorMessage = String(error);
-      }
+      lastError = normalizedError;
+      
+      const isHardQuotaError = errorMessage.toLowerCase().includes("exceeded your current quota") || errorMessage.toLowerCase().includes("billing details");
       
       const isQuotaError = 
+        !isHardQuotaError && (
         errorCode === 429 || 
-        errorStatus === "RESOURCE_EXHAUSTED" ||
         errorMessage.includes("RESOURCE_EXHAUSTED") || 
         errorMessage.includes("429") ||
         errorMessage.includes("quota exceeded") ||
-        errorMessage.includes("Rate limit");
+        errorMessage.includes("Rate limit")
+        );
 
       if (isQuotaError && i < maxRetries) {
         const backoff = delay * Math.pow(2.5, i);
@@ -61,7 +46,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, delay = 2000):
         await new Promise(resolve => setTimeout(resolve, backoff));
         continue;
       }
-      throw error;
+      throw normalizedError;
     }
   }
   throw lastError;
@@ -144,24 +129,32 @@ export async function transcribeAudio(base64Audio: string, mimeType: string) {
   });
 }
 
+import { aiProtocol } from "./aiProtocolManager";
+
 // 3. Generate speech (gemini-2.5-flash-preview-tts)
 export async function generateSpeech(text: string) {
-  return sequentialExecution('speech', () => withRetry(async () => {
-    const ai = getAi();
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
+  return aiProtocol.execute('generateSpeech', 
+    () => sequentialExecution('speech', () => withRetry(async () => {
+      const ai = getAi();
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: text }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
           },
         },
-      },
-    });
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  }, 4, 4000));
+      });
+      return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    }, 4, 4000)),
+    (state) => {
+      console.warn(`[AI Protocol] generateSpeech falling back to null. State: ${state}`);
+      return null;
+    }
+  );
 }
 
 export function playAudioBase64(base64Data: string): Promise<void> & { stop?: () => void } {
@@ -262,13 +255,13 @@ export function createChatSession() {
   });
 }
 
-// 7. Generate images (gemini-2.5-flash-image by default, upgrade to 3.1 for high-quality)
+// 7. Generate images (gemini-3.1-flash-image-preview for high-quality)
 export async function generateCulturalImage(prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K") {
-  return sequentialExecution('image', () => withRetry(async () => {
-    const ai = getAi();
-    try {
+  return aiProtocol.execute('generateCulturalImage', 
+    () => sequentialExecution('image', () => withRetry(async () => {
+      const ai = getAi();
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
+        model: "gemini-3.1-flash-image-preview",
         contents: {
           parts: [
             {
@@ -279,6 +272,7 @@ export async function generateCulturalImage(prompt: string, size: "512px" | "1K"
         config: {
           imageConfig: {
             aspectRatio: "1:1",
+            imageSize: size,
           },
         },
       });
@@ -289,30 +283,60 @@ export async function generateCulturalImage(prompt: string, size: "512px" | "1K"
         }
       }
       return null;
-    } catch (error: any) {
-      console.error("Image generation error:", error);
-      // If 403, it might be a permission issue with the model or key
-      if (error.message?.includes("PERMISSION_DENIED") || error.message?.includes("403")) {
-        throw new Error("Permission denied for image generation. Please ensure you have a valid API key with billing enabled if using high-quality models.");
-      }
-      throw error;
+    }, 6, 12000)),
+    (state) => {
+      console.warn(`[AI Protocol] generateCulturalImage rerouted. Fallback provided. State: ${state}`);
+      // Return a nice image based on the prompt using Picsum
+      return `https://picsum.photos/seed/${encodeURIComponent("hawaii " + prompt)}/1024/1024`;
     }
-  }, 6, 12000)); // Even more retries (6) and longer start delay (12s) for image tasks
+  );
+}
+
+/**
+ * Extracts a complete string representation of an error, handling nested JSON payloads that GenAI sometimes throws.
+ */
+function getErrorDetails(error: any): { message: string, code: number } {
+  if (!error) return { message: "", code: 0 };
+  
+  let message = "";
+  let code = 0;
+  
+  if (typeof error === 'string') {
+    message = error;
+  } else {
+    message = error.message || error.error?.message || "";
+    code = error.code || error.error?.code || error.response?.status || 0;
+    
+    // Fallback to JSON payload if message is still barren
+    if (!message) {
+      try {
+        message = JSON.stringify(error);
+      } catch (e) {
+        message = String(error);
+      }
+    }
+  }
+  
+  return { message, code };
 }
 
 /**
  * Handles common Gemini API errors, specifically status 429 (Resource Exhausted).
  */
 export function handleGeminiError(error: any): string {
-  console.error("Gemini API Error:", error);
+  const { message: errorMessage, code: errorCode } = getErrorDetails(error);
   
-  const errorMessage = error.message || "";
-  const errorStatus = error.status || "";
-  const errorCode = error.code || (error.response?.status);
-
-  if (errorCode === 429 || errorStatus === "RESOURCE_EXHAUSTED" || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("429")) {
-    return "The AI is currently busy with high-quality tasks. Please wait about 30 seconds and click 'Retry' if available. Image and speech generation share a strict limit.";
+  // Don't log the raw error object directly if it's the 429, log a warning instead
+  if (errorCode === 429 || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota")) {
+    console.warn("Gemini Quota/Rate Limit Error:", errorMessage);
+    
+    if (errorMessage.toLowerCase().includes("exceeded your current quota") || errorMessage.toLowerCase().includes("billing details")) {
+      return "The AI quota has been exceeded for this project. The app may use placeholders or limited functionality until the quota resets.";
+    }
+    return "The AI is currently busy. Please wait about 30 seconds and click 'Retry' if available.";
   }
+  
+  console.error("Gemini API Error:", error);
   
   if (errorCode === 403 || errorMessage.includes("PERMISSION_DENIED")) {
     return "Access denied. This feature may require a valid API key with appropriate permissions or billing enabled.";
@@ -323,9 +347,9 @@ export function handleGeminiError(error: any): string {
 
 // 8. Use Google Search data (gemini-3-flash-preview with googleSearch)
 export async function searchCulturalEvents(query: string) {
-  return withRetry(async () => {
-    const ai = getAi();
-    try {
+  return aiProtocol.execute('searchCulturalEvents', 
+    () => withRetry(async () => {
+      const ai = getAi();
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Search for recent or upcoming Hawaiian cultural events, news, or language resources related to: ${query}`,
@@ -337,22 +361,33 @@ export async function searchCulturalEvents(query: string) {
         text: response.text,
         groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [],
       };
-    } catch (error: any) {
-      console.error("Search error:", error);
-      // Fallback to normal generation if search tool is restricted
-      if (error.message?.includes("PERMISSION_DENIED") || error.message?.includes("403")) {
-        const fallbackResponse = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: `Provide information about Hawaiian cultural events, news, or resources related to: ${query} (Note: I'm providing this from my internal knowledge as real-time search is currently unavailable).`,
-        });
-        return {
-          text: fallbackResponse.text,
-          groundingChunks: [],
-        };
+    }),
+    async (state) => {
+      console.warn(`[AI Protocol] searchCulturalEvents rerouted. State: ${state}`);
+      
+      // If just Auth Error on search tool, attempt normal generation fallback
+      if (state === 'DEGRADED_AUTH') {
+        try {
+          const ai = getAi();
+          const fallbackResponse = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Provide information about Hawaiian cultural events, news, or resources related to: ${query} (Note: I'm providing this from my internal knowledge as real-time search is currently unavailable).`,
+          });
+          return {
+            text: fallbackResponse.text,
+            groundingChunks: [],
+          };
+        } catch (e) {
+           // Fall through to quota fallback if it completely fails
+        }
       }
-      throw error;
+      
+      return {
+        text: `No recent search results found due to system limits. Consider practicing basic Hawaiian grammar while we recover.`,
+        groundingChunks: [],
+      };
     }
-  });
+  );
 }
 
 // 9. Process PDF exercises (gemini-3.1-pro-preview)

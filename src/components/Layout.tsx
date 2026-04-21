@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { BookOpen, Mic, MessageCircle, Book, Video, Dumbbell, LayoutDashboard, Radio, LogOut, Sparkles } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { ProtocolNotifier } from './ProtocolNotifier';
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -19,6 +20,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-transparent text-stone-900 font-sans">
+      <ProtocolNotifier />
       {/* Sidebar - Glassmorphic */}
       <aside className="w-64 glass-dark border-r border-stone-200/20 flex flex-col z-20">
         <div className="p-6 border-b border-stone-200/10">

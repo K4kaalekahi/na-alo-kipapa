@@ -82,7 +82,7 @@ export function LiveConversation() {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
-          systemInstruction: "You are Kumu, a friendly Hawaiian language instructor. You are having a live voice conversation with a student. Keep your responses brief, conversational, and encouraging. Use simple Hawaiian words and explain them.",
+          systemInstruction: "Aloha mai! You are Kumu, a friendly and interactive Hawaiian AI avatar instructor. Your very first response must greet the user in Hawaiian, introduce yourself as Kumu, and offer to help them practice 'ōlelo Hawai'i (the language) or explore Hawaiian culture. Keep your responses brief and highly conversational.",
         },
       });
       
@@ -153,21 +153,21 @@ export function LiveConversation() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 max-w-5xl mx-auto flex flex-col items-center justify-center min-h-[85vh] space-y-12"
+      className="p-4 sm:p-8 max-w-5xl mx-auto flex flex-col items-center justify-center min-h-[85vh] space-y-12"
     >
-      <header className="text-center mb-10">
-        <h1 className="text-6xl font-black text-on-surface tracking-tighter font-headline leading-none mb-4">Live Session</h1>
-        <p className="text-on-surface-variant text-xl font-serif max-w-2xl mx-auto leading-relaxed opacity-80 italic">Direct auditory resonance with Kumu through the digital ether.</p>
+      <header className="text-center mb-6">
+        <h1 className="text-5xl sm:text-6xl font-black text-on-surface tracking-tighter font-headline leading-none mb-4">Live Session</h1>
+        <p className="text-on-surface-variant text-lg sm:text-xl font-serif max-w-2xl mx-auto leading-relaxed opacity-80 italic">Have a real-time vocal conversation with Kumu.</p>
       </header>
 
-      <div className="glass-card p-16 rounded-[4rem] flex flex-col items-center justify-center w-full max-w-2xl relative overflow-hidden glass-glow">
+      <div className="glass-card p-10 sm:p-16 rounded-[4rem] flex flex-col items-center justify-center w-full max-w-2xl relative overflow-hidden glass-glow">
         {/* Animated ambient pulses when recording */}
         {isRecording && (
           <div className="absolute inset-0 pointer-events-none">
             <motion.div 
               animate={{ scale: [1, 2, 1], opacity: [0.1, 0.4, 0.1] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute inset-0 bg-primary/20 rounded-full blur-[100px]"
+              className="absolute inset-0 bg-emerald-500/20 rounded-full blur-[100px]"
             />
             <motion.div 
               animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.6, 0.2] }}
@@ -177,51 +177,53 @@ export function LiveConversation() {
           </div>
         )}
 
-        <div className="relative z-10 flex flex-col items-center gap-12">
-          <button
-            onClick={isRecording ? stopRecording : connectLiveAPI}
-            disabled={isConnecting}
-            className={`w-48 h-48 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg relative group ${
-              isRecording 
-                ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/40' 
-                : 'bg-primary hover:bg-primary/90 text-on-primary shadow-primary/40'
-            } ${isConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
-          >
-            {isConnecting ? (
-              <Loader2 className="w-16 h-16 animate-spin" />
-            ) : isRecording ? (
-              <StopCircle className="w-16 h-16" />
-            ) : (
-              <Mic className="w-16 h-16 group-hover:rotate-12 transition-transform" />
-            )}
-            
-            {/* Pulsing ring around button */}
-            {isRecording && (
-                <div className="absolute inset-0 -m-4 border-4 border-red-500/20 rounded-full animate-ping" />
-            )}
-          </button>
+        <div className="relative z-10 flex flex-col items-center gap-10">
           
-          <div className="text-center space-y-3">
-            <p className="text-3xl font-black text-on-surface font-headline tracking-tighter uppercase whitespace-nowrap">
-              {isConnecting ? 'Aligning Frequencies...' : isRecording ? 'Vocal Transmission Active' : 'Initiate Communion'}
+          <div className="relative">
+            <div className={`w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-4 border-white shadow-xl transition-all duration-500 bg-emerald-100 ${isRecording ? 'scale-110 shadow-emerald-500/40 ring-8 ring-emerald-500/20' : ''}`}>
+              <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Kumu&backgroundColor=e5eef1" alt="Kumu Avatar" className="w-full h-full object-cover" />
+            </div>
+            
+            {/* The microphone button sits overlapping the bottom of the avatar */}
+            <button
+              onClick={isRecording ? stopRecording : connectLiveAPI}
+              disabled={isConnecting}
+              className={`absolute -bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg group ${
+                isRecording 
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/40 animate-pulse' 
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/40'
+              } ${isConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}`}
+            >
+              {isConnecting ? (
+                <Loader2 className="w-8 h-8 animate-spin" />
+              ) : isRecording ? (
+                <StopCircle className="w-8 h-8" />
+              ) : (
+                <Mic className="w-8 h-8 group-hover:rotate-12 transition-transform" />
+              )}
+            </button>
+          </div>
+          
+          <div className="text-center space-y-2 mt-4">
+            <p className="text-2xl sm:text-3xl font-black text-stone-800 font-headline tracking-tight">
+              {isConnecting ? 'Connecting to Kumu...' : isRecording ? 'Kumu is listening' : 'Start Conversation'}
             </p>
-            <p className="text-on-surface-variant text-base font-serif italic opacity-70">
-              {isConnecting ? 'Whispering to the winds...' : isRecording ? 'Kumu is listening. Speak clearly.' : 'Tap the vessel to begin your session.'}
+            <p className="text-stone-600 text-base font-serif opacity-80">
+              {isConnecting ? 'Please wait...' : isRecording ? 'Speak clearly into your microphone.' : 'Tap the microphone to speak with your AI instructor.'}
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="mt-12 p-6 bg-red-500/10 border border-red-500/20 rounded-[2rem] text-red-900 text-sm max-w-lg text-center backdrop-blur-3xl italic relative z-10">
-            <p className="font-bold uppercase tracking-widest text-[10px] text-red-600 mb-2">Transmission Variance</p>
+          <div className="mt-10 p-5 bg-red-50 border border-red-200 rounded-[2rem] text-red-800 text-sm max-w-lg text-center backdrop-blur-3xl relative z-10 font-medium">
             {error}
           </div>
         )}
       </div>
       
-      <div className="flex items-center gap-3 text-[10px] font-black text-on-surface-variant uppercase tracking-[0.4em] opacity-40">
-        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-        Real-Time Neural Processing Active
+      <div className="flex items-center gap-3 text-[10px] font-black text-emerald-800/40 uppercase tracking-[0.2em]">
+        <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
+        AI Avatar Instructor Online
       </div>
     </motion.div>
   );
